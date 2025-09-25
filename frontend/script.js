@@ -63,8 +63,15 @@ async function startResearch() {
         }
         
         const data = await response.json();
-        currentReport = data.report;
-        updateUIState('success');
+        
+        if (data.status === 'success') {
+            // Research completed immediately
+            currentReport = data.report;
+            updateUIState('success');
+        } else if (data.status === 'queued') {
+            // Research is queued, poll for status
+            await pollQueueStatus(data.session_id, data.queue_position);
+        }
         
     } catch (error) {
         console.error('Research error:', error);
@@ -74,14 +81,60 @@ async function startResearch() {
     }
 }
 
-function updateUIState(state, errorMsg = '') {
+async function pollQueueStatus(sessionId, initialQueuePosition) {
+    let queuePosition = initialQueuePosition;
+    let attempts = 0;
+    const maxAttempts = 300; // 5 minutes max
+    
+    const poll = async () => {
+        try {
+            const response = await fetch(`/api/queue-status/${sessionId}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to get queue status');
+            }
+            
+            const status = await response.json();
+            
+            if (status.status === 'completed') {
+                currentReport = status.result;
+                updateUIState('success');
+                return;
+            } else if (status.status === 'failed') {
+                throw new Error(status.error || 'Research failed');
+            } else if (status.status === 'processing') {
+                updateUIState('processing', `Processing your request...`);
+            } else if (status.status === 'queued') {
+                queuePosition = status.queue_position;
+                const waitTime = Math.ceil(status.estimated_wait_time / 60);
+                updateUIState('queued', `Position ${queuePosition} in queue. Estimated wait: ${waitTime} minutes`);
+            }
+            
+            attempts++;
+            if (attempts < maxAttempts) {
+                setTimeout(poll, 2000); // Poll every 2 seconds
+            } else {
+                throw new Error('Request timed out');
+            }
+            
+        } catch (error) {
+            console.error('Queue polling error:', error);
+            updateUIState('error', error.message);
+        }
+    };
+    
+    // Start polling
+    poll();
+}
+
+function updateUIState(state, message = '') {
     // Hide all sections first
     statusSection.classList.add('hidden');
     resultsSection.classList.add('hidden');
     errorSection.classList.add('hidden');
     
     // Update button state based on current state
-    if (state === 'researching') {
+    if (state === 'researching' || state === 'queued' || state === 'processing') {
         researchButton.disabled = true;
         buttonText.textContent = 'Researching...';
         spinner.classList.remove('hidden');
@@ -98,6 +151,28 @@ function updateUIState(state, errorMsg = '') {
             statusSection.classList.remove('hidden');
             break;
             
+        case 'queued':
+            statusSection.classList.remove('hidden');
+            // Update status message with queue info
+            const statusTitle = document.querySelector('.status-title');
+            const statusDesc = document.querySelector('.status-description');
+            if (statusTitle && statusDesc) {
+                statusTitle.textContent = 'Request Queued';
+                statusDesc.textContent = message || 'Your research request has been added to the queue.';
+            }
+            break;
+            
+        case 'processing':
+            statusSection.classList.remove('hidden');
+            // Update status message
+            const statusTitle2 = document.querySelector('.status-title');
+            const statusDesc2 = document.querySelector('.status-description');
+            if (statusTitle2 && statusDesc2) {
+                statusTitle2.textContent = 'Processing Request';
+                statusDesc2.textContent = message || 'Your research is being processed...';
+            }
+            break;
+            
         case 'success':
             resultsSection.classList.remove('hidden');
             displayReport(currentReport);
@@ -105,7 +180,7 @@ function updateUIState(state, errorMsg = '') {
             
         case 'error':
             errorSection.classList.remove('hidden');
-            errorMessage.textContent = errorMsg;
+            errorMessage.textContent = message;
             break;
     }
 }
