@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Formatting Test</title>
+    <link rel="stylesheet" href="/static/style.css?v=5">
+</head>
+<body>
+    <div class="container">
+        <h1>Academic Formatting Test</h1>
+        
+        <div class="report-content">
+            <h1>Executive Summary</h1>
+            <p>This is a test paragraph to demonstrate the academic formatting. The text should be justified and indented properly. This paragraph should show Times New Roman font with proper line spacing and academic styling.</p>
+            
+            <h2>Key Findings</h2>
+            <p>This is another paragraph to test the formatting. The first line should be indented, and the text should be justified. The heading above should be bold and clearly distinguished from the body text.</p>
+            
+            <h3>Detailed Analysis</h3>
+            <p>This paragraph tests the H3 heading formatting. The text should maintain consistent formatting throughout the document.</p>
+            
+            <ul>
+                <li>This is a bullet point to test list formatting</li>
+                <li>Another bullet point with proper spacing</li>
+                <li>Final bullet point to verify list styling</li>
+            </ul>
+            
+            <p>This paragraph contains <strong>bold text</strong> and <em>italic text</em> to test the formatting of emphasis elements.</p>
+        </div>
+        
+        <button onclick="forceCSSReload()">Force CSS Reload</button>
+        <button onclick="location.reload(true)">Hard Refresh</button>
+    </div>
+    
+    <script>
+        function forceCSSReload() {
+            const links = document.querySelectorAll('link[rel="stylesheet"]');
+            links.forEach(link => {
+                const href = link.href;
+                link.href = href.split('?')[0] + '?v=' + Date.now();
+            });
+            alert('CSS reloaded!');
+        }
+        
+        console.log('Test page loaded');
+        console.log('CSS version:', document.querySelector('link[rel="stylesheet"]').href);
+    </script>
+</body>
+</html>

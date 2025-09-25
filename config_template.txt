@@ -1,0 +1,8 @@
+# API Keys Configuration Template
+# Copy this file to .env and add your actual API keys
+
+# Get your OpenRouter API key from: https://openrouter.ai/
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Get your Tavily API key from: https://tavily.com/
+TAVILY_API_KEY=your_tavily_api_key_here

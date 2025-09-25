@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Research Hub</title>
+    <link rel="stylesheet" href="/static/style.css?v=11">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="title">Research Hub</h1>
+            <p class="subtitle">Generate comprehensive research reports using AI</p>
+        </header>
+
+        <main class="main-content">
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="research-topic" class="input-label">Research Topic</label>
+                    <input 
+                        type="text" 
+                        id="research-topic" 
+                        class="input-field" 
+                        placeholder="Enter your research topic (e.g., 'Artificial Intelligence in Healthcare')"
+                        maxlength="200"
+                    >
+                </div>
+                <button id="research-btn" class="research-button">
+                    <span class="button-text">Start Research</span>
+                    <div class="spinner hidden"></div>
+                </button>
+            </div>
+
+            <div id="status-section" class="status-section hidden">
+                <div class="status-card">
+                    <div class="status-icon">
+                        <div class="pulse-dot"></div>
+                    </div>
+                    <div class="status-content">
+                        <h3 class="status-title">Research in Progress</h3>
+                        <p class="status-description">Generating research plan and gathering information...</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="results-section" class="results-section hidden">
+                <div class="results-header">
+                    <h2 class="results-title">Research Report</h2>
+                    <div class="results-actions">
+                        <button id="copy-btn" class="action-button">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy Report
+                        </button>
+                        <button id="download-btn" class="action-button">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7,10 12,15 17,10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download PDF
+                        </button>
+                    </div>
+                </div>
+                <div id="report-content" class="report-content"></div>
+            </div>
+
+            <div id="error-section" class="error-section hidden">
+                <div class="error-card">
+                    <div class="error-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                        </svg>
+                    </div>
+                    <div class="error-content">
+                        <h3 class="error-title">Research Failed</h3>
+                        <p id="error-message" class="error-description"></p>
+                        <button id="retry-btn" class="retry-button">Try Again</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p class="footer-text">
+                Research Hub
+            </p>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="/static/script.js?v=11"></script>
+</body>
+</html>
