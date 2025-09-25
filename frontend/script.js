@@ -348,27 +348,16 @@ function downloadReport() {
 
     const topic = document.getElementById('research-topic').value.trim() || 'Research Report';
 
-    let previewWindow = null;
-    try {
-        // Opening a window synchronously increases success rate on iOS/Safari
-        previewWindow = window.open('', '_blank');
-    } catch (openError) {
-        console.warn('Unable to open preview window:', openError);
-    }
-
     try {
         showToast('Generating PDF...', 'success');
-        generatePDFWithJsPDF(topic, currentReport, previewWindow);
+        generatePDFWithJsPDF(topic, currentReport);
     } catch (error) {
         console.error('PDF generation error:', error);
-        if (previewWindow && !previewWindow.closed) {
-            previewWindow.close();
-        }
         showToast('Failed to generate PDF. Please try again.', 'error');
     }
 }
 
-function generatePDFWithJsPDF(topic, report, previewWindow) {
+function generatePDFWithJsPDF(topic, report) {
     const jspdf = window.jspdf;
     if (!jspdf || !jspdf.jsPDF) {
         throw new Error('jsPDF library not available');
@@ -377,6 +366,7 @@ function generatePDFWithJsPDF(topic, report, previewWindow) {
     const { jsPDF } = jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const filename = `${topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_report.pdf`;
+    const isIOS = /iP(hone|od|ad)/i.test(window.navigator.userAgent);
 
     const pdfContent = generatePDFContent(topic, report);
 
@@ -401,30 +391,37 @@ function generatePDFWithJsPDF(topic, report, previewWindow) {
                 callback: function (docInstance) {
                     try {
                         const blob = docInstance.output('blob');
-                        const url = URL.createObjectURL(blob);
+                        const urlCleanupDelay = isIOS ? 0 : 1500;
 
-                        if (previewWindow && !previewWindow.closed) {
-                            previewWindow.location = url;
-                            previewWindow.focus();
-                            showToast('PDF opened in a new tab. Use share/save to download.', 'success');
+                        if (isIOS) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                try {
+                                    const dataUrl = reader.result;
+                                    window.location.href = dataUrl;
+                                    showToast('PDF opened. Use share or save in Safari to download.', 'success');
+                                } catch (iosError) {
+                                    console.error('Failed to open PDF on iOS:', iosError);
+                                    showToast('Unable to open PDF on this device.', 'error');
+                                }
+                            };
+                            reader.onerror = (iosError) => {
+                                console.error('Failed to convert PDF blob on iOS:', iosError);
+                                showToast('Unable to open PDF on this device.', 'error');
+                            };
+                            reader.readAsDataURL(blob);
                         } else {
+                            const url = URL.createObjectURL(blob);
                             const link = document.createElement('a');
                             link.href = url;
                             link.download = filename;
                             link.style.display = 'none';
                             document.body.appendChild(link);
-                            try {
-                                link.click();
-                                showToast('PDF downloaded successfully!', 'success');
-                            } catch (clickError) {
-                                console.warn('Anchor click failed, opening new tab instead.', clickError);
-                                window.open(url, '_blank');
-                                showToast('PDF opened in a new tab. Use share/save to download.', 'success');
-                            }
+                            link.click();
                             document.body.removeChild(link);
+                            setTimeout(() => URL.revokeObjectURL(url), urlCleanupDelay);
+                            showToast('PDF downloaded successfully!', 'success');
                         }
-
-                        setTimeout(() => URL.revokeObjectURL(url), 1500);
                     } catch (generationError) {
                         console.error('Failed to create PDF blob:', generationError);
                         showToast('Failed to generate PDF. Please try again.', 'error');
