@@ -376,34 +376,62 @@ function generatePDFWithJsPDF(topic, report) {
     iframe.style.width = '0';
     iframe.style.height = '0';
     iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow.document;
-    iframeDoc.open();
-    iframeDoc.write(pdfContent);
-    iframeDoc.close();
 
     iframe.onload = function () {
-        doc.html(iframeDoc.body, {
-            callback: function (docInstance) {
-                const blob = docInstance.output('blob');
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                showToast('PDF downloaded successfully!', 'success');
-                document.body.removeChild(iframe);
-            },
-            x: 40,
-            y: 40,
-            width: 515,
-            windowWidth: 800
-        });
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.html(iframeDoc.body, {
+                callback: function (docInstance) {
+                    try {
+                        const blob = docInstance.output('blob');
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = filename;
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        try {
+                            link.click();
+                        } catch (clickError) {
+                            console.warn('Anchor click failed, opening new tab instead.', clickError);
+                            window.open(url, '_blank');
+                        }
+                        document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        showToast('PDF downloaded successfully!', 'success');
+                    } catch (generationError) {
+                        console.error('Failed to create PDF blob:', generationError);
+                        showToast('Failed to generate PDF. Please try again.', 'error');
+                    } finally {
+                        if (iframe.parentNode) {
+                            iframe.parentNode.removeChild(iframe);
+                        }
+                    }
+                },
+                x: 40,
+                y: 40,
+                width: 515,
+                windowWidth: 800
+            });
+        } catch (err) {
+            console.error('Failed to render iframe content for PDF:', err);
+            showToast('Failed to generate PDF. Please try again.', 'error');
+            if (iframe.parentNode) {
+                iframe.parentNode.removeChild(iframe);
+            }
+        }
     };
+
+    document.body.appendChild(iframe);
+
+    if ('srcdoc' in iframe) {
+        iframe.srcdoc = pdfContent;
+    } else {
+        const iframeDoc = iframe.contentWindow.document;
+        iframeDoc.open();
+        iframeDoc.write(pdfContent);
+        iframeDoc.close();
+    }
 }
 
 function generatePDFContent(topic, report) {
