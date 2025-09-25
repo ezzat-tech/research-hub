@@ -369,25 +369,41 @@ function generatePDFWithJsPDF(topic, report) {
 
     const pdfContent = generatePDFContent(topic, report);
 
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.width = '595pt'; // A4 width in points
-    container.innerHTML = pdfContent;
-    document.body.appendChild(container);
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
 
-    doc.html(container, {
-        callback: function (docInstance) {
-            docInstance.save(filename);
-            showToast('PDF downloaded successfully!', 'success');
-            document.body.removeChild(container);
-        },
-        x: 40,
-        y: 40,
-        width: 515,
-        windowWidth: 800
-    });
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(pdfContent);
+    iframeDoc.close();
+
+    iframe.onload = function () {
+        doc.html(iframeDoc.body, {
+            callback: function (docInstance) {
+                const blob = docInstance.output('blob');
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                showToast('PDF downloaded successfully!', 'success');
+                document.body.removeChild(iframe);
+            },
+            x: 40,
+            y: 40,
+            width: 515,
+            windowWidth: 800
+        });
+    };
 }
 
 function generatePDFContent(topic, report) {
