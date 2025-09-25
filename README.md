@@ -18,121 +18,131 @@ research_agent/
 ├── main.py              # FastAPI server
 ├── frontend/
 │   ├── index.html       # Main web interface
-│   ├── style.css        # Modern CSS styling
-│   └── script.js        # Frontend JavaScript
+│   ├── style.css        # Styling
+│   └── script.js        # Frontend logic
+├── .env                 # Environment variables (API keys)
 ├── requirements.txt     # Python dependencies
-├── config_template.txt  # API keys template
 └── README.md           # This file
 ```
 
-## Setup Instructions
+## Quick Start
 
-### 1. Install Dependencies
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd research_agent
+   ```
 
-```bash
-pip install -r requirements.txt
-```
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### 2. Configure API Keys
+3. **Set up API keys**
+   - Copy `.env` template and add your API keys:
+   ```bash
+   # Get your OpenRouter API key from: https://openrouter.ai/
+   OPENROUTER_API_KEY=your_openrouter_api_key_here
+   
+   # Get your Tavily API key from: https://tavily.com/
+   TAVILY_API_KEY=your_tavily_api_key_here
+   ```
 
-1. Copy `config_template.txt` to `.env`
-2. Get your API keys:
-   - **OpenRouter API Key**: Sign up at [openrouter.ai](https://openrouter.ai/)
-   - **Tavily API Key**: Sign up at [tavily.com](https://tavily.com/)
-3. Add your keys to the `.env` file:
+4. **Run the application**
+   ```bash
+   python start.py
+   ```
+   
+   Or alternatively:
+   ```bash
+   python main.py
+   ```
 
-```env
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-TAVILY_API_KEY=your_tavily_api_key_here
-```
+5. **Open your browser**
+   The application will be available at `http://localhost:8001`
 
-### 3. Run the Application
+## API Keys Required
 
-```bash
-python main.py
-```
+- **OpenRouter API Key**: Get from [https://openrouter.ai/](https://openrouter.ai/)
+  - Used to access free DeepSeek models for research planning and report generation
+- **Tavily API Key**: Get from [https://tavily.com/](https://tavily.com/)
+  - Used for real-time web search and information gathering
 
-The application will be available at `http://localhost:8000`
+## Technologies Used
+
+- **Backend**: FastAPI (Python)
+- **Frontend**: HTML, CSS, JavaScript
+- **AI Models**: DeepSeek (via OpenRouter) - Free models only
+- **Search**: Tavily Search API
+- **Async**: asyncio for concurrent operations
 
 ## Usage
 
-1. **Enter Research Topic**: Type your research topic in the input field
-2. **Start Research**: Click "Start Research" or press Enter
-3. **Wait for Processing**: The system will:
-   - Generate a research plan using DeepSeek R1
-   - Search for relevant information using Tavily
+1. Enter your research topic in the input field
+2. Click "Start Research" to begin the process
+3. The system will:
+   - Generate a research plan using AI
+   - Search the web for relevant information
    - Generate a comprehensive report
-4. **View Results**: The formatted report will be displayed with options to copy or download
-
-## API Endpoints
-
-- `GET /` - Serve the main web interface
-- `POST /api/research` - Conduct research on a given topic
-- `GET /api/health` - Health check endpoint
-
-## Technology Stack
-
-### Backend
-- **FastAPI**: Modern Python web framework
-- **OpenRouter**: Access to DeepSeek R1 model
-- **Tavily**: Real-time web search API
-- **httpx**: Async HTTP client
-- **Pydantic**: Data validation
-
-### Frontend
-- **HTML5**: Semantic markup
-- **CSS3**: Modern styling with gradients and animations
-- **Vanilla JavaScript**: No frameworks, pure JS
-- **Responsive Design**: Mobile-friendly interface
-
-## Features in Detail
-
-### Research Workflow
-1. **Research Planning**: DeepSeek Chat generates 5-7 specific research questions
-2. **Information Gathering**: Tavily searches for relevant information for each question
-3. **Report Generation**: DeepSeek Chat synthesizes findings into a structured report
-
-### Report Structure
-- **Executive Summary**: 2-3 paragraph overview
-- **Introduction**: Background and context
-- **Body**: Main findings organized by themes
-- **Conclusion**: Key takeaways and implications
-- **Thesis**: Main argument or position
-
-### User Interface
-- **Modern Design**: Gradient backgrounds, smooth animations
-- **Responsive**: Works on desktop, tablet, and mobile
-- **Accessibility**: Keyboard shortcuts, focus management
-- **Feedback**: Loading states, progress indicators, error handling
+4. View and download your research report
 
 ## Development
 
 ### Running in Development Mode
 
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Using the start script (recommended)
+python start.py
+
+# Or directly with uvicorn
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-### Environment Variables
+### Project Structure Details
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `OPENROUTER_API_KEY` | API key for OpenRouter service | Yes |
-| `TAVILY_API_KEY` | API key for Tavily search service | Yes |
+- `main.py`: FastAPI server with research endpoints
+- `frontend/`: Static web files served by FastAPI
+- `.env`: Environment variables for API keys
+- `requirements.txt`: Python package dependencies
+
+## Features in Detail
+
+### Research Process
+
+1. **Research Planning**: AI generates a comprehensive research plan
+2. **Web Search**: Multiple targeted searches using Tavily API
+3. **Report Generation**: AI creates structured, academic-quality reports
+4. **Formatting**: Professional formatting with proper headings and sections
+
+### Report Structure
+
+- **Executive Summary**: Brief overview of key findings
+- **Introduction**: Context and background information
+- **Key Findings**: Main findings organized by themes
+- **Conclusion**: Summary and implications
+- **Thesis**: Main argument or position
+
+### Error Handling
+
+- Graceful handling of API failures
+- User-friendly error messages
+- Fallback mechanisms for model failures
+- Comprehensive logging for debugging
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **API Key Errors**: Ensure your API keys are correctly set in the `.env` file
-2. **Rate Limiting**: The app includes delays between API calls to avoid rate limits
-3. **Network Issues**: Check your internet connection and API service status
+1. **API Key Errors**: Make sure your API keys are correctly set in the `.env` file
+2. **Port Already in Use**: The application uses port 8001 by default
+3. **Model Failures**: The system automatically tries multiple free models
 
-### Error Messages
+### Getting Help
 
-- **"Research Failed"**: Check API keys and network connection
-- **"OpenRouter API error"**: Verify your OpenRouter API key and credits
-- **"Tavily API error"**: Verify your Tavily API key and usage limits
+If you encounter issues:
+1. Check that your API keys are valid and active
+2. Ensure all dependencies are installed
+3. Check the console output for specific error messages
 
 ## License
 
@@ -140,4 +150,4 @@ This project is open source and available under the MIT License.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome! Please feel free to submit a Pull Request.
