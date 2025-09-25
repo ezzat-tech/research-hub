@@ -348,16 +348,27 @@ function downloadReport() {
 
     const topic = document.getElementById('research-topic').value.trim() || 'Research Report';
 
+    let previewWindow = null;
+    try {
+        // Opening a window synchronously increases success rate on iOS/Safari
+        previewWindow = window.open('', '_blank');
+    } catch (openError) {
+        console.warn('Unable to open preview window:', openError);
+    }
+
     try {
         showToast('Generating PDF...', 'success');
-        generatePDFWithJsPDF(topic, currentReport);
+        generatePDFWithJsPDF(topic, currentReport, previewWindow);
     } catch (error) {
         console.error('PDF generation error:', error);
+        if (previewWindow && !previewWindow.closed) {
+            previewWindow.close();
+        }
         showToast('Failed to generate PDF. Please try again.', 'error');
     }
 }
 
-function generatePDFWithJsPDF(topic, report) {
+function generatePDFWithJsPDF(topic, report, previewWindow) {
     const jspdf = window.jspdf;
     if (!jspdf || !jspdf.jsPDF) {
         throw new Error('jsPDF library not available');
@@ -377,6 +388,12 @@ function generatePDFWithJsPDF(topic, report) {
     iframe.style.height = '0';
     iframe.style.border = '0';
 
+    const cleanUp = () => {
+        if (iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+        }
+    };
+
     iframe.onload = function () {
         try {
             const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
@@ -385,27 +402,34 @@ function generatePDFWithJsPDF(topic, report) {
                     try {
                         const blob = docInstance.output('blob');
                         const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = filename;
-                        link.style.display = 'none';
-                        document.body.appendChild(link);
-                        try {
-                            link.click();
-                        } catch (clickError) {
-                            console.warn('Anchor click failed, opening new tab instead.', clickError);
-                            window.open(url, '_blank');
+
+                        if (previewWindow && !previewWindow.closed) {
+                            previewWindow.location = url;
+                            previewWindow.focus();
+                            showToast('PDF opened in a new tab. Use share/save to download.', 'success');
+                        } else {
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = filename;
+                            link.style.display = 'none';
+                            document.body.appendChild(link);
+                            try {
+                                link.click();
+                                showToast('PDF downloaded successfully!', 'success');
+                            } catch (clickError) {
+                                console.warn('Anchor click failed, opening new tab instead.', clickError);
+                                window.open(url, '_blank');
+                                showToast('PDF opened in a new tab. Use share/save to download.', 'success');
+                            }
+                            document.body.removeChild(link);
                         }
-                        document.body.removeChild(link);
-                        setTimeout(() => URL.revokeObjectURL(url), 1000);
-                        showToast('PDF downloaded successfully!', 'success');
+
+                        setTimeout(() => URL.revokeObjectURL(url), 1500);
                     } catch (generationError) {
                         console.error('Failed to create PDF blob:', generationError);
                         showToast('Failed to generate PDF. Please try again.', 'error');
                     } finally {
-                        if (iframe.parentNode) {
-                            iframe.parentNode.removeChild(iframe);
-                        }
+                        cleanUp();
                     }
                 },
                 x: 40,
@@ -416,9 +440,7 @@ function generatePDFWithJsPDF(topic, report) {
         } catch (err) {
             console.error('Failed to render iframe content for PDF:', err);
             showToast('Failed to generate PDF. Please try again.', 'error');
-            if (iframe.parentNode) {
-                iframe.parentNode.removeChild(iframe);
-            }
+            cleanUp();
         }
     };
 
