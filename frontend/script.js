@@ -2,12 +2,12 @@
 let isResearching = false;
 let currentReport = '';
 
-// DOM elements
+// DOM elements - Fixed to match actual HTML IDs
 const researchTopicInput = document.getElementById('research-topic');
-const researchButton = document.getElementById('research-button');
-const reportContainer = document.getElementById('report-container');
-const downloadButton = document.getElementById('download-button');
-const statusContainer = document.getElementById('status-container');
+const researchButton = document.getElementById('research-btn'); // Fixed: was 'research-button'
+const reportContainer = document.getElementById('results-section'); // Fixed: was 'report-container'
+const downloadButton = document.getElementById('download-btn'); // Fixed: was 'download-button'
+const statusContainer = document.getElementById('status-section'); // Fixed: was 'status-container'
 const statusTitle = document.getElementById('status-title');
 const statusDescription = document.getElementById('status-description');
 
@@ -134,68 +134,68 @@ async function pollQueueStatus(sessionId, initialQueuePosition) {
 
 function updateUIState(state, message = '') {
     const spinner = document.querySelector('.spinner');
-    const buttonText = document.querySelector('#button-text');
+    const buttonText = document.querySelector('.button-text');
     
     switch (state) {
         case 'idle':
             researchButton.disabled = !researchTopicInput.value.trim();
             buttonText.textContent = 'Start Research';
-            spinner.style.display = 'none';
-            reportContainer.style.display = 'none';
-            statusContainer.style.display = 'none';
-            downloadButton.style.display = 'none';
+            if (spinner) spinner.style.display = 'none';
+            if (reportContainer) reportContainer.style.display = 'none';
+            if (statusContainer) statusContainer.style.display = 'none';
+            if (downloadButton) downloadButton.style.display = 'none';
             break;
             
         case 'researching':
             researchButton.disabled = true;
             buttonText.textContent = 'Researching...';
-            spinner.style.display = 'inline-block';
-            reportContainer.style.display = 'none';
-            statusContainer.style.display = 'none';
-            downloadButton.style.display = 'none';
+            if (spinner) spinner.style.display = 'inline-block';
+            if (reportContainer) reportContainer.style.display = 'none';
+            if (statusContainer) statusContainer.style.display = 'none';
+            if (downloadButton) downloadButton.style.display = 'none';
             break;
             
         case 'queued':
             researchButton.disabled = true;
             buttonText.textContent = 'Queued...';
-            spinner.style.display = 'inline-block';
-            reportContainer.style.display = 'none';
-            statusContainer.style.display = 'block';
-            statusTitle.textContent = 'Research Queued';
-            statusDescription.textContent = message;
-            downloadButton.style.display = 'none';
+            if (spinner) spinner.style.display = 'inline-block';
+            if (reportContainer) reportContainer.style.display = 'none';
+            if (statusContainer) statusContainer.style.display = 'block';
+            if (statusTitle) statusTitle.textContent = 'Research Queued';
+            if (statusDescription) statusDescription.textContent = message;
+            if (downloadButton) downloadButton.style.display = 'none';
             break;
             
         case 'processing':
             researchButton.disabled = true;
             buttonText.textContent = 'Processing...';
-            spinner.style.display = 'inline-block';
-            reportContainer.style.display = 'none';
-            statusContainer.style.display = 'block';
-            statusTitle.textContent = 'Processing Research';
-            statusDescription.textContent = message;
-            downloadButton.style.display = 'none';
+            if (spinner) spinner.style.display = 'inline-block';
+            if (reportContainer) reportContainer.style.display = 'none';
+            if (statusContainer) statusContainer.style.display = 'block';
+            if (statusTitle) statusTitle.textContent = 'Processing Research';
+            if (statusDescription) statusDescription.textContent = message;
+            if (downloadButton) downloadButton.style.display = 'none';
             break;
             
         case 'success':
             researchButton.disabled = false;
             buttonText.textContent = 'Start Research';
-            spinner.style.display = 'none';
-            reportContainer.style.display = 'block';
-            statusContainer.style.display = 'none';
-            downloadButton.style.display = 'block';
+            if (spinner) spinner.style.display = 'none';
+            if (reportContainer) reportContainer.style.display = 'block';
+            if (statusContainer) statusContainer.style.display = 'none';
+            if (downloadButton) downloadButton.style.display = 'block';
             displayReport(currentReport);
             break;
             
         case 'error':
             researchButton.disabled = false;
             buttonText.textContent = 'Start Research';
-            spinner.style.display = 'none';
-            reportContainer.style.display = 'none';
-            statusContainer.style.display = 'block';
-            statusTitle.textContent = 'Research Failed';
-            statusDescription.textContent = message;
-            downloadButton.style.display = 'none';
+            if (spinner) spinner.style.display = 'none';
+            if (reportContainer) reportContainer.style.display = 'none';
+            if (statusContainer) statusContainer.style.display = 'block';
+            if (statusTitle) statusTitle.textContent = 'Research Failed';
+            if (statusDescription) statusDescription.textContent = message;
+            if (downloadButton) downloadButton.style.display = 'none';
             break;
     }
     
@@ -204,8 +204,10 @@ function updateUIState(state, message = '') {
 
 function displayReport(report) {
     const reportContent = document.getElementById('report-content');
-    const formattedReport = formatReport(report);
-    reportContent.innerHTML = formattedReport;
+    if (reportContent) {
+        const formattedReport = formatReport(report);
+        reportContent.innerHTML = formattedReport;
+    }
 }
 
 function formatReport(report) {
