@@ -345,84 +345,49 @@ function downloadReport() {
         showToast('No report available to download', 'error');
         return;
     }
-    
+
     const topic = document.getElementById('research-topic').value.trim() || 'Research Report';
-    
-    console.log('Using mobile-compatible PDF generation');
-    showToast('Generating PDF...', 'success');
-    
-    // Try multiple methods for better mobile compatibility
-    if (window.navigator.userAgent.includes('Mobile')) {
-        generatePDFForMobile(topic, currentReport);
-    } else {
-        generatePDFWithPrint(topic, currentReport);
-    }
-}
 
-function generatePDFForMobile(topic, report) {
     try {
-        // Create a data URL for mobile download
-        const pdfContent = generatePDFContent(topic, report);
-        
-        // Create a blob with the HTML content
-        const blob = new Blob([pdfContent], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        
-        // Create a temporary link and trigger download
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_report.html`;
-        link.style.display = 'none';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Clean up
-        URL.revokeObjectURL(url);
-        
-        showToast('HTML report downloaded! Open in browser and use "Print to PDF"', 'success');
-        
-    } catch (error) {
-        console.error('Mobile PDF generation error:', error);
-        showToast('Mobile PDF generation failed. Trying alternative method...', 'warning');
-        generatePDFWithPrint(topic, report);
-    }
-}
-
-function generatePDFWithPrint(topic, report) {
-    try {
-        showToast('Opening PDF preview...', 'success');
-        
-        // Create a new window for PDF generation
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
-        
-        if (!printWindow) {
-            // If popup blocked, try alternative method
-            showToast('Popup blocked. Using alternative download method...', 'warning');
-            generatePDFForMobile(topic, report);
-            return;
-        }
-        
-        // Generate PDF-ready HTML content
-        const pdfContent = generatePDFContent(topic, report);
-        
-        printWindow.document.write(pdfContent);
-        printWindow.document.close();
-        
-        // Wait for content to load, then trigger print dialog
-        printWindow.onload = function() {
-            setTimeout(() => {
-                printWindow.print();
-                showToast('PDF ready! Use "Save as PDF" in the print dialog.', 'success');
-            }, 500);
-        };
-        
+        showToast('Generating PDF...', 'success');
+        generatePDFWithJsPDF(topic, currentReport);
     } catch (error) {
         console.error('PDF generation error:', error);
-        showToast('PDF generation failed. Trying alternative method...', 'error');
-        generatePDFForMobile(topic, report);
+        showToast('Failed to generate PDF. Please try again.', 'error');
     }
+}
+
+function generatePDFWithJsPDF(topic, report) {
+    const jspdf = window.jspdf;
+    if (!jspdf || !jspdf.jsPDF) {
+        throw new Error('jsPDF library not available');
+    }
+
+    const { jsPDF } = jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const filename = `${topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_report.pdf`;
+
+    const pdfContent = generatePDFContent(topic, report);
+
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '595pt'; // A4 width in points
+    container.innerHTML = pdfContent;
+    document.body.appendChild(container);
+
+    doc.html(container, {
+        callback: function (docInstance) {
+            docInstance.save(filename);
+            showToast('PDF downloaded successfully!', 'success');
+            document.body.removeChild(container);
+        },
+        x: 40,
+        y: 40,
+        width: 515,
+        windowWidth: 800
+    });
 }
 
 function generatePDFContent(topic, report) {
