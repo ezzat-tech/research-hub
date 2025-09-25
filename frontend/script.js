@@ -4,10 +4,10 @@ let currentReport = '';
 
 // DOM elements - Fixed to match actual HTML IDs
 const researchTopicInput = document.getElementById('research-topic');
-const researchButton = document.getElementById('research-btn'); // Fixed: was 'research-button'
-const reportContainer = document.getElementById('results-section'); // Fixed: was 'report-container'
-const downloadButton = document.getElementById('download-btn'); // Fixed: was 'download-button'
-const statusContainer = document.getElementById('status-section'); // Fixed: was 'status-container'
+const researchButton = document.getElementById('research-btn');
+const reportContainer = document.getElementById('results-section');
+const downloadButton = document.getElementById('download-btn');
+const statusContainer = document.getElementById('status-section');
 const statusTitle = document.getElementById('status-title');
 const statusDescription = document.getElementById('status-description');
 
@@ -43,6 +43,16 @@ function forceCSSReload() {
 // Call this on page load to ensure fresh CSS
 window.addEventListener('load', forceCSSReload);
 
+function showElement(element) {
+    if (!element) return;
+    element.classList.remove('hidden');
+}
+
+function hideElement(element) {
+    if (!element) return;
+    element.classList.add('hidden');
+}
+
 async function startResearch() {
     const topic = researchTopicInput.value.trim();
 
@@ -67,14 +77,15 @@ async function startResearch() {
             throw new Error(errorData.detail || 'Research failed');
         }
 
+        // Indicate gathering phase while waiting for JSON parsing
+        updateUIState('gathering');
+
         const data = await response.json();
 
         if (data.status === 'success') {
-            // Research completed immediately
             currentReport = data.report;
             updateUIState('success');
         } else if (data.status === 'queued') {
-            // Research is queued, poll for status
             await pollQueueStatus(data.session_id, data.queue_position);
         }
 
@@ -136,78 +147,100 @@ function updateUIState(state, message = '') {
     const spinner = document.querySelector('.spinner');
     const buttonText = document.querySelector('.button-text');
     
+    const setSpinner = (visible) => {
+        if (!spinner) return;
+        if (visible) {
+            spinner.classList.remove('hidden');
+        } else {
+            spinner.classList.add('hidden');
+        }
+    };
+    
     switch (state) {
         case 'idle':
             researchButton.disabled = !researchTopicInput.value.trim();
             buttonText.textContent = 'Start Research';
-            if (spinner) spinner.style.display = 'none';
-            if (reportContainer) reportContainer.style.display = 'none';
-            if (statusContainer) statusContainer.style.display = 'none';
-            if (downloadButton) downloadButton.style.display = 'none';
+            setSpinner(false);
+            hideElement(reportContainer);
+            hideElement(statusContainer);
+            hideElement(downloadButton);
+            hideElement(document.getElementById('error-section'));
             break;
             
         case 'researching':
             researchButton.disabled = true;
             buttonText.textContent = 'Researching...';
-            if (spinner) spinner.style.display = 'inline-block';
-            if (reportContainer) reportContainer.style.display = 'none';
-            if (statusContainer) statusContainer.style.display = 'none';
-            if (downloadButton) downloadButton.style.display = 'none';
+            setSpinner(true);
+            hideElement(reportContainer);
+            hideElement(downloadButton);
+            hideElement(document.getElementById('error-section'));
+            if (statusContainer) {
+                showElement(statusContainer);
+                if (statusTitle) statusTitle.textContent = 'Creating Research Plan';
+                if (statusDescription) statusDescription.textContent = 'We are drafting the research plan for your topic.';
+            }
             break;
             
-        case 'queued':
+        case 'gathering':
             researchButton.disabled = true;
-            buttonText.textContent = 'Queued...';
-            if (spinner) spinner.style.display = 'inline-block';
-            if (reportContainer) reportContainer.style.display = 'none';
-            if (statusContainer) statusContainer.style.display = 'block';
-            if (statusTitle) statusTitle.textContent = 'Research Queued';
-            if (statusDescription) statusDescription.textContent = message;
-            if (downloadButton) downloadButton.style.display = 'none';
-            break;
-            
-        case 'processing':
-            researchButton.disabled = true;
-            buttonText.textContent = 'Processing...';
-            if (spinner) spinner.style.display = 'inline-block';
-            if (reportContainer) reportContainer.style.display = 'none';
-            if (statusContainer) statusContainer.style.display = 'block';
-            if (statusTitle) statusTitle.textContent = 'Processing Research';
-            if (statusDescription) statusDescription.textContent = message;
-            if (downloadButton) downloadButton.style.display = 'none';
+            buttonText.textContent = 'Researching...';
+            setSpinner(true);
+            hideElement(reportContainer);
+            hideElement(downloadButton);
+            hideElement(document.getElementById('error-section'));
+            if (statusContainer) {
+                showElement(statusContainer);
+                if (statusTitle) statusTitle.textContent = 'Gathering Information';
+                if (statusDescription) statusDescription.textContent = message || 'Collecting the most relevant sources and insights...';
+            }
             break;
             
         case 'success':
             researchButton.disabled = false;
             buttonText.textContent = 'Start Research';
-            if (spinner) spinner.style.display = 'none';
-            if (reportContainer) reportContainer.style.display = 'block';
-            if (statusContainer) statusContainer.style.display = 'none';
-            if (downloadButton) downloadButton.style.display = 'block';
+            setSpinner(false);
+            showElement(reportContainer);
+            showElement(downloadButton);
+            hideElement(statusContainer);
+            hideElement(document.getElementById('error-section'));
             displayReport(currentReport);
             break;
             
         case 'error':
             researchButton.disabled = false;
             buttonText.textContent = 'Start Research';
-            if (spinner) spinner.style.display = 'none';
-            if (reportContainer) reportContainer.style.display = 'none';
-            if (statusContainer) statusContainer.style.display = 'block';
-            if (statusTitle) statusTitle.textContent = 'Research Failed';
-            if (statusDescription) statusDescription.textContent = message;
-            if (downloadButton) downloadButton.style.display = 'none';
+            setSpinner(false);
+            hideElement(reportContainer);
+            hideElement(downloadButton);
+            showElement(document.getElementById('error-section'));
+            hideElement(statusContainer);
+            if (statusDescription && statusContainer) {
+                showElement(statusContainer);
+                if (statusTitle) statusTitle.textContent = 'Research Failed';
+                statusDescription.textContent = message;
+            }
+            break;
+            
+        case 'processing':
+            researchButton.disabled = true;
+            buttonText.textContent = 'Processing...';
+            setSpinner(true);
+            hideElement(reportContainer);
+            hideElement(downloadButton);
+            hideElement(document.getElementById('error-section'));
+            if (statusContainer) {
+                showElement(statusContainer);
+                if (statusTitle) statusTitle.textContent = 'Finalizing Report';
+                if (statusDescription) statusDescription.textContent = message || 'Finalizing your research report...';
+            }
             break;
     }
-    
-    isResearching = false; // Reset the flag
 }
 
 function displayReport(report) {
     const reportContent = document.getElementById('report-content');
-    if (reportContent) {
-        const formattedReport = formatReport(report);
-        reportContent.innerHTML = formattedReport;
-    }
+    const formattedReport = formatReport(report);
+    reportContent.innerHTML = formattedReport;
 }
 
 function formatReport(report) {
