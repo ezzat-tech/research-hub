@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """
-Startup script for AI Research Agent
+Startup script for Research Hub
 """
 
 import uvicorn
 import os
-from dotenv import load_dotenv
 
 def main():
-    """Start the AI Research Agent server"""
-    print("🚀 Starting AI Research Agent...")
+    """Start the Research Hub server"""
+    print("🚀 Starting Research Hub...")
     print("=" * 40)
     
-    # Load environment variables
-    load_dotenv()
+    # Try to load environment variables, but don't fail if .env has issues
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load .env file: {e}")
+        print("   Make sure to set environment variables manually or fix the .env file")
     
     # Check if API keys are set
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
@@ -29,8 +33,8 @@ def main():
         print("   Please set your Tavily API key in the .env file")
         print("   Get your key from: https://tavily.com/")
     
-    print("\n🌐 Server will be available at: http://localhost:8000")
-    print("📖 Open the URL in your browser to use the AI Research Agent")
+    print("\n🌐 Server will be available at: http://localhost:8001")
+    print("📖 Open the URL in your browser to use Research Hub")
     print("🛑 Press Ctrl+C to stop the server")
     print("=" * 40)
     
@@ -38,7 +42,7 @@ def main():
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,  # Changed to match main.py
         reload=True,
         log_level="info"
     )
