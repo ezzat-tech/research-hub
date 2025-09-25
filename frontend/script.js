@@ -1,25 +1,18 @@
+// Global variables
+let isResearching = false;
+let currentReport = '';
+
 // DOM elements
 const researchTopicInput = document.getElementById('research-topic');
-const researchButton = document.getElementById('research-btn');
-const buttonText = document.querySelector('.button-text');
-const spinner = document.querySelector('.spinner');
-const statusSection = document.getElementById('status-section');
-const resultsSection = document.getElementById('results-section');
-const reportContent = document.getElementById('report-content');
-const errorSection = document.getElementById('error-section');
-const errorMessage = document.getElementById('error-message');
-const copyButton = document.getElementById('copy-btn');
-const downloadButton = document.getElementById('download-btn');
-const retryButton = document.getElementById('retry-btn');
-
-// State management
-let currentReport = '';
-let isResearching = false;
+const researchButton = document.getElementById('research-button');
+const reportContainer = document.getElementById('report-container');
+const downloadButton = document.getElementById('download-button');
+const statusContainer = document.getElementById('status-container');
+const statusTitle = document.getElementById('status-title');
+const statusDescription = document.getElementById('status-description');
 
 // Event listeners
 researchButton.addEventListener('click', startResearch);
-retryButton.addEventListener('click', startResearch);
-copyButton.addEventListener('click', copyReport);
 downloadButton.addEventListener('click', downloadReport);
 
 // Allow Enter key to start research
@@ -35,19 +28,31 @@ researchTopicInput.addEventListener('input', () => {
     researchButton.disabled = !topic || isResearching;
 });
 
-// Initialize button state
-researchButton.disabled = true;
+// Initialize
+updateUIState('idle');
+
+// Force CSS reload to prevent caching issues
+function forceCSSReload() {
+    const links = document.querySelectorAll('link[rel="stylesheet"]');
+    links.forEach(link => {
+        const href = link.href.split('?')[0];
+        link.href = href + '?v=' + Date.now();
+    });
+}
+
+// Call this on page load to ensure fresh CSS
+window.addEventListener('load', forceCSSReload);
 
 async function startResearch() {
     const topic = researchTopicInput.value.trim();
-    
+
     if (!topic || isResearching) {
         return;
     }
-    
+
     isResearching = true;
     updateUIState('researching');
-    
+
     try {
         const response = await fetch('/api/research', {
             method: 'POST',
@@ -56,14 +61,14 @@ async function startResearch() {
             },
             body: JSON.stringify({ topic }),
         });
-        
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.detail || 'Research failed');
         }
-        
+
         const data = await response.json();
-        
+
         if (data.status === 'success') {
             // Research completed immediately
             currentReport = data.report;
@@ -72,7 +77,7 @@ async function startResearch() {
             // Research is queued, poll for status
             await pollQueueStatus(data.session_id, data.queue_position);
         }
-        
+
     } catch (error) {
         console.error('Research error:', error);
         updateUIState('error', error.message);
@@ -85,17 +90,17 @@ async function pollQueueStatus(sessionId, initialQueuePosition) {
     let queuePosition = initialQueuePosition;
     let attempts = 0;
     const maxAttempts = 300; // 5 minutes max
-    
+
     const poll = async () => {
         try {
             const response = await fetch(`/api/queue-status/${sessionId}`);
-            
+
             if (!response.ok) {
                 throw new Error('Failed to get queue status');
             }
-            
+
             const status = await response.json();
-            
+
             if (status.status === 'completed') {
                 currentReport = status.result;
                 updateUIState('success');
@@ -109,94 +114,105 @@ async function pollQueueStatus(sessionId, initialQueuePosition) {
                 const waitTime = Math.ceil(status.estimated_wait_time / 60);
                 updateUIState('queued', `Position ${queuePosition} in queue. Estimated wait: ${waitTime} minutes`);
             }
-            
+
             attempts++;
             if (attempts < maxAttempts) {
                 setTimeout(poll, 2000); // Poll every 2 seconds
             } else {
                 throw new Error('Request timed out');
             }
-            
+
         } catch (error) {
             console.error('Queue polling error:', error);
             updateUIState('error', error.message);
         }
     };
-    
+
     // Start polling
     poll();
 }
 
 function updateUIState(state, message = '') {
-    // Hide all sections first
-    statusSection.classList.add('hidden');
-    resultsSection.classList.add('hidden');
-    errorSection.classList.add('hidden');
-    
-    // Update button state based on current state
-    if (state === 'researching' || state === 'queued' || state === 'processing') {
-        researchButton.disabled = true;
-        buttonText.textContent = 'Researching...';
-        spinner.classList.remove('hidden');
-    } else {
-        // For success or error, stop the loading state
-        isResearching = false;
-        researchButton.disabled = false;
-        buttonText.textContent = 'Start Research';
-        spinner.classList.add('hidden');
-    }
+    const spinner = document.querySelector('.spinner');
+    const buttonText = document.querySelector('#button-text');
     
     switch (state) {
+        case 'idle':
+            researchButton.disabled = !researchTopicInput.value.trim();
+            buttonText.textContent = 'Start Research';
+            spinner.style.display = 'none';
+            reportContainer.style.display = 'none';
+            statusContainer.style.display = 'none';
+            downloadButton.style.display = 'none';
+            break;
+            
         case 'researching':
-            statusSection.classList.remove('hidden');
+            researchButton.disabled = true;
+            buttonText.textContent = 'Researching...';
+            spinner.style.display = 'inline-block';
+            reportContainer.style.display = 'none';
+            statusContainer.style.display = 'none';
+            downloadButton.style.display = 'none';
             break;
             
         case 'queued':
-            statusSection.classList.remove('hidden');
-            // Update status message with queue info
-            const statusTitle = document.querySelector('.status-title');
-            const statusDesc = document.querySelector('.status-description');
-            if (statusTitle && statusDesc) {
-                statusTitle.textContent = 'Request Queued';
-                statusDesc.textContent = message || 'Your research request has been added to the queue.';
-            }
+            researchButton.disabled = true;
+            buttonText.textContent = 'Queued...';
+            spinner.style.display = 'inline-block';
+            reportContainer.style.display = 'none';
+            statusContainer.style.display = 'block';
+            statusTitle.textContent = 'Research Queued';
+            statusDescription.textContent = message;
+            downloadButton.style.display = 'none';
             break;
             
         case 'processing':
-            statusSection.classList.remove('hidden');
-            // Update status message
-            const statusTitle2 = document.querySelector('.status-title');
-            const statusDesc2 = document.querySelector('.status-description');
-            if (statusTitle2 && statusDesc2) {
-                statusTitle2.textContent = 'Processing Request';
-                statusDesc2.textContent = message || 'Your research is being processed...';
-            }
+            researchButton.disabled = true;
+            buttonText.textContent = 'Processing...';
+            spinner.style.display = 'inline-block';
+            reportContainer.style.display = 'none';
+            statusContainer.style.display = 'block';
+            statusTitle.textContent = 'Processing Research';
+            statusDescription.textContent = message;
+            downloadButton.style.display = 'none';
             break;
             
         case 'success':
-            resultsSection.classList.remove('hidden');
+            researchButton.disabled = false;
+            buttonText.textContent = 'Start Research';
+            spinner.style.display = 'none';
+            reportContainer.style.display = 'block';
+            statusContainer.style.display = 'none';
+            downloadButton.style.display = 'block';
             displayReport(currentReport);
             break;
             
         case 'error':
-            errorSection.classList.remove('hidden');
-            errorMessage.textContent = message;
+            researchButton.disabled = false;
+            buttonText.textContent = 'Start Research';
+            spinner.style.display = 'none';
+            reportContainer.style.display = 'none';
+            statusContainer.style.display = 'block';
+            statusTitle.textContent = 'Research Failed';
+            statusDescription.textContent = message;
+            downloadButton.style.display = 'none';
             break;
     }
+    
+    isResearching = false; // Reset the flag
 }
 
 function displayReport(report) {
-    // Format the report with proper HTML structure
+    const reportContent = document.getElementById('report-content');
     const formattedReport = formatReport(report);
     reportContent.innerHTML = formattedReport;
 }
 
 function formatReport(report) {
-    // First, let's clean up the report text and ensure proper section separation
-    let cleanReport = report;
+    if (!report) return '';
     
-    // Remove any # symbols and clean up the text
-    cleanReport = cleanReport.replace(/#+/g, '');
+    // Clean up the report by removing markdown symbols
+    let cleanReport = report.replace(/#+/g, '');
     
     // Ensure main sections are on their own lines
     const mainSections = ['Executive Summary', 'Introduction', 'Key Findings', 'Conclusion', 'Thesis'];
@@ -250,58 +266,43 @@ function formatReport(report) {
 }
 
 function formatMarkdownText(text) {
-    // Convert markdown formatting to HTML with academic styling
-    let formatted = text;
+    if (!text) return '';
     
-    // Convert bold text **text** to <strong>text</strong>
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Convert bold text
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
-    // Convert italic text *text* to <em>text</em> (but not if it's already bold)
-    formatted = formatted.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+    // Convert italic text
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
     
-    // Convert bullet points - item to <li>item</li>
-    const lines = formatted.split('\n');
-    const processedLines = [];
+    // Convert bullet points
+    const lines = text.split('\n');
+    const formattedLines = [];
     let inList = false;
     
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        
-        // Check if line starts with bullet point
-        if (line.match(/^\s*[-*+]\s+/)) {
+    for (const line of lines) {
+        const stripped = line.trim();
+        if (stripped.startsWith('- ')) {
             if (!inList) {
-                processedLines.push('<ul>');
+                formattedLines.push('<ul>');
                 inList = true;
             }
-            const listItem = line.replace(/^\s*[-*+]\s+/, '');
-            processedLines.push(`<li>${listItem}</li>`);
+            formattedLines.push(`<li>${stripped.substring(2)}</li>`);
         } else {
             if (inList) {
-                processedLines.push('</ul>');
+                formattedLines.push('</ul>');
                 inList = false;
             }
-            if (line.trim()) {
-                processedLines.push(line);
+            if (stripped) {
+                formattedLines.push(`<p>${stripped}</p>`);
             }
         }
     }
     
-    // Close any remaining list
     if (inList) {
-        processedLines.push('</ul>');
+        formattedLines.push('</ul>');
     }
     
-    return processedLines.join('\n');
-}
-
-async function copyReport() {
-    try {
-        await navigator.clipboard.writeText(currentReport);
-        showToast('Report copied to clipboard!');
-    } catch (error) {
-        console.error('Failed to copy:', error);
-        showToast('Failed to copy report', 'error');
-    }
+    return formattedLines.join('');
 }
 
 function downloadReport() {
@@ -312,80 +313,44 @@ function downloadReport() {
     
     const topic = document.getElementById('research-topic').value.trim() || 'Research Report';
     
-    console.log('Using client-side PDF generation (no backend call)');
-    showToast('Generating PDF using client-side method...', 'success');
+    console.log('Using mobile-compatible PDF generation');
+    showToast('Generating PDF...', 'success');
     
-    // Use client-side PDF generation (no backend call needed)
-    generatePDFWithPrint(topic, currentReport);
+    // Try multiple methods for better mobile compatibility
+    if (window.navigator.userAgent.includes('Mobile')) {
+        generatePDFForMobile(topic, currentReport);
+    } else {
+        generatePDFWithPrint(topic, currentReport);
+    }
 }
 
-function generatePDFWithJsPDF(topic, report) {
+function generatePDFForMobile(topic, report) {
     try {
-        showToast('Generating PDF...', 'success');
+        // Create a data URL for mobile download
+        const pdfContent = generatePDFContent(topic, report);
         
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+        // Create a blob with the HTML content
+        const blob = new Blob([pdfContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
         
-        // Set up the document
-        doc.setFont('helvetica');
-        doc.setFontSize(20);
-        doc.text(topic, 20, 30);
+        // Create a temporary link and trigger download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_report.html`;
+        link.style.display = 'none';
         
-        doc.setFontSize(10);
-        doc.text(`Generated on ${new Date().toLocaleDateString()}`, 20, 40);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         
-        // Add a line
-        doc.line(20, 45, 190, 45);
+        // Clean up
+        URL.revokeObjectURL(url);
         
-        // Process the report content
-        const lines = doc.splitTextToSize(report, 170);
-        let yPosition = 60;
-        
-        doc.setFontSize(12);
-        
-        for (let i = 0; i < lines.length; i++) {
-            if (yPosition > 280) {
-                doc.addPage();
-                yPosition = 20;
-            }
-            
-            // Check if line is a header
-            if (lines[i].startsWith('# ')) {
-                doc.setFontSize(16);
-                doc.setFont('helvetica', 'bold');
-                doc.text(lines[i].substring(2), 20, yPosition);
-                yPosition += 10;
-                doc.setFontSize(12);
-                doc.setFont('helvetica', 'normal');
-            } else if (lines[i].startsWith('## ')) {
-                doc.setFontSize(14);
-                doc.setFont('helvetica', 'bold');
-                doc.text(lines[i].substring(3), 20, yPosition);
-                yPosition += 8;
-                doc.setFontSize(12);
-                doc.setFont('helvetica', 'normal');
-            } else if (lines[i].startsWith('### ')) {
-                doc.setFontSize(13);
-                doc.setFont('helvetica', 'bold');
-                doc.text(lines[i].substring(4), 20, yPosition);
-                yPosition += 7;
-                doc.setFontSize(12);
-                doc.setFont('helvetica', 'normal');
-            } else {
-                doc.text(lines[i], 20, yPosition);
-                yPosition += 6;
-            }
-        }
-        
-        // Save the PDF
-        const fileName = `${topic.replace(/[^a-zA-Z0-9]/g, '_')}_report.pdf`;
-        doc.save(fileName);
-        
-        showToast('PDF downloaded successfully!', 'success');
+        showToast('HTML report downloaded! Open in browser and use "Print to PDF"', 'success');
         
     } catch (error) {
-        console.error('jsPDF generation failed:', error);
-        showToast('jsPDF failed, using print method...', 'error');
+        console.error('Mobile PDF generation error:', error);
+        showToast('Mobile PDF generation failed. Trying alternative method...', 'warning');
         generatePDFWithPrint(topic, report);
     }
 }
@@ -396,6 +361,13 @@ function generatePDFWithPrint(topic, report) {
         
         // Create a new window for PDF generation
         const printWindow = window.open('', '_blank', 'width=800,height=600');
+        
+        if (!printWindow) {
+            // If popup blocked, try alternative method
+            showToast('Popup blocked. Using alternative download method...', 'warning');
+            generatePDFForMobile(topic, report);
+            return;
+        }
         
         // Generate PDF-ready HTML content
         const pdfContent = generatePDFContent(topic, report);
@@ -412,8 +384,9 @@ function generatePDFWithPrint(topic, report) {
         };
         
     } catch (error) {
-        console.error('Print PDF generation failed:', error);
-        showToast('Failed to generate PDF', 'error');
+        console.error('PDF generation error:', error);
+        showToast('PDF generation failed. Trying alternative method...', 'error');
+        generatePDFForMobile(topic, report);
     }
 }
 
@@ -433,190 +406,234 @@ function generatePDFContent(topic, report) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${topic} - Research Report</title>
     <style>
-        @page {
-            size: A4;
-            margin: 2.5cm 2cm;
-        }
-        
-        body {
-            font-family: 'Times New Roman', 'Georgia', serif;
-            line-height: 1.7;
-            color: #2c3e50;
-            margin: 0;
-            padding: 0;
-            background: white;
-            font-size: 12pt;
-        }
-        
-        .report-header {
-            text-align: center;
-            margin-bottom: 3rem;
-            border-bottom: 2px solid #2c3e50;
-            padding-bottom: 1rem;
-        }
-        
-        .report-title {
-            font-size: 18pt;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-            color: #1a202c;
-            font-family: 'Arial', sans-serif;
-        }
-        
-        .report-date {
-            font-size: 10pt;
-            color: #666;
-            font-style: italic;
-        }
-        
-        .report-content {
-            margin-top: 1rem;
-        }
-        
-        /* Academic heading styles */
-        /* Section Headings - BOLD - 13pt */
-        h1 {
-            font-size: 13pt;
-            font-weight: bold !important;
-            color: #000000;
-            margin-top: 1.5rem;
-            margin-bottom: 0.8rem;
-            text-align: left;
-            border-bottom: 1pt solid #000000;
-            padding-bottom: 0.3rem;
-            font-family: 'Arial', sans-serif;
-            display: block !important;
-            clear: both !important;
-        }
-        
-        h1:first-child {
-            margin-top: 0;
-        }
-        
-        /* Section Subheadings - BOLD - 12pt */
-        h2 {
-            font-size: 12pt;
-            font-weight: bold !important;
-            color: #000000;
-            margin-top: 1.2rem;
-            margin-bottom: 0.6rem;
-            text-align: left;
-            font-family: 'Arial', sans-serif;
-            display: block !important;
-            clear: both !important;
-        }
-        
-        h3 {
-            font-size: 12pt;
-            font-weight: bold !important;
-            color: #000000;
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-            text-align: left;
-            font-family: 'Arial', sans-serif;
-            display: block !important;
-            clear: both !important;
-        }
-        
-        /* Section Body - NOT BOLD - 11pt */
-        p {
-            margin-bottom: 1rem;
-            text-align: justify;
-            text-indent: 1.5rem;
-            line-height: 1.6;
-            font-size: 11pt;
-            font-weight: normal !important;
-            color: #000000;
-            font-family: 'Times New Roman', 'Georgia', serif;
-        }
-        
-        /* First paragraph after heading should not be indented */
-        h1 + p,
-        h2 + p,
-        h3 + p {
-            text-indent: 0;
-        }
-        
-        /* Lists - NOT BOLD - 11pt */
-        ul, ol {
-            margin: 1rem 0;
-            padding-left: 2rem;
-            text-align: left;
-            font-weight: normal !important;
-            font-size: 11pt;
-            font-family: 'Times New Roman', 'Georgia', serif;
-        }
-        
-        ul {
-            list-style-type: disc;
-        }
-        
-        ol {
-            list-style-type: decimal;
-        }
-        
-        li {
-            margin-bottom: 0.3rem;
-            line-height: 1.6;
-            font-size: 11pt;
-            font-weight: normal !important;
-            color: #000000;
-            font-family: 'Times New Roman', 'Georgia', serif;
-        }
-        
-        /* Text formatting */
-        strong {
-            font-weight: bold !important;
-            color: #000000;
-        }
-        
-        em {
-            font-style: italic;
-            color: #4a5568;
-        }
-        
-        /* Page breaks */
-        .page-break {
-            page-break-before: always;
-        }
-        
-        /* Print optimizations */
         @media print {
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .no-print {
-                display: none !important;
-            }
-            
-            /* Ensure consistent margins */
             @page {
-                margin: 2.5cm 2cm;
+                margin: 0.5in;
+                size: A4;
+            }
+            
+            body {
+                font-family: 'Times New Roman', 'Georgia', serif;
+                font-size: 11pt;
+                line-height: 1.4;
+                color: #000000;
+                margin: 0;
+                padding: 0;
+            }
+            
+            h1 {
+                font-family: 'Inter', sans-serif;
+                font-size: 13pt;
+                font-weight: bold;
+                color: #000000;
+                margin-top: 20pt;
+                margin-bottom: 10pt;
+                display: block !important;
+                clear: both !important;
+            }
+            
+            h2, h3 {
+                font-family: 'Inter', sans-serif;
+                font-size: 12pt;
+                font-weight: bold;
+                color: #000000;
+                margin-top: 15pt;
+                margin-bottom: 8pt;
+                display: block !important;
+                clear: both !important;
+            }
+            
+            p, ul, ol, li {
+                font-family: 'Times New Roman', 'Georgia', serif;
+                font-size: 11pt;
+                font-weight: normal !important;
+                color: #000000;
+                text-align: justify;
+                text-indent: 1.5rem;
+                margin-top: 8pt;
+                margin-bottom: 8pt;
+            }
+            
+            p:first-child {
+                text-indent: 0;
+            }
+            
+            strong {
+                font-weight: bold !important;
+            }
+            
+            em {
+                font-style: italic;
+            }
+            
+            ul, ol {
+                margin-left: 20pt;
+                text-indent: 0;
+            }
+            
+            li {
+                text-indent: 0;
+                margin-bottom: 4pt;
+            }
+            
+            .header {
+                text-align: center;
+                margin-bottom: 30pt;
+                border-bottom: 2px solid #000;
+                padding-bottom: 15pt;
+            }
+            
+            .title {
+                font-size: 18pt;
+                font-weight: bold;
+                margin-bottom: 10pt;
+            }
+            
+            .date {
+                font-size: 12pt;
+                color: #666;
+            }
+            
+            .footer {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                text-align: center;
+                font-size: 9pt;
+                color: #666;
+                border-top: 1px solid #ccc;
+                padding: 5pt;
+            }
+        }
+        
+        @media screen {
+            body {
+                font-family: 'Times New Roman', 'Georgia', serif;
+                font-size: 11pt;
+                line-height: 1.4;
+                color: #000000;
+                margin: 20px;
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            
+            .container {
+                max-width: 8.5in;
+                margin: 0 auto;
+                background: white;
+                padding: 1in;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            }
+            
+            h1 {
+                font-family: 'Inter', sans-serif;
+                font-size: 13pt;
+                font-weight: bold;
+                color: #000000;
+                margin-top: 20pt;
+                margin-bottom: 10pt;
+                display: block !important;
+                clear: both !important;
+            }
+            
+            h2, h3 {
+                font-family: 'Inter', sans-serif;
+                font-size: 12pt;
+                font-weight: bold;
+                color: #000000;
+                margin-top: 15pt;
+                margin-bottom: 8pt;
+                display: block !important;
+                clear: both !important;
+            }
+            
+            p, ul, ol, li {
+                font-family: 'Times New Roman', 'Georgia', serif;
+                font-size: 11pt;
+                font-weight: normal !important;
+                color: #000000;
+                text-align: justify;
+                text-indent: 1.5rem;
+                margin-top: 8pt;
+                margin-bottom: 8pt;
+            }
+            
+            p:first-child {
+                text-indent: 0;
+            }
+            
+            strong {
+                font-weight: bold !important;
+            }
+            
+            em {
+                font-style: italic;
+            }
+            
+            ul, ol {
+                margin-left: 20pt;
+                text-indent: 0;
+            }
+            
+            li {
+                text-indent: 0;
+                margin-bottom: 4pt;
+            }
+            
+            .header {
+                text-align: center;
+                margin-bottom: 30pt;
+                border-bottom: 2px solid #000;
+                padding-bottom: 15pt;
+            }
+            
+            .title {
+                font-size: 18pt;
+                font-weight: bold;
+                margin-bottom: 10pt;
+            }
+            
+            .date {
+                font-size: 12pt;
+                color: #666;
+            }
+            
+            .footer {
+                margin-top: 30pt;
+                text-align: center;
+                font-size: 9pt;
+                color: #666;
+                border-top: 1px solid #ccc;
+                padding-top: 10pt;
             }
         }
     </style>
 </head>
 <body>
-    <div class="report-header">
-        <div class="report-title">${topic}</div>
-        <div class="report-date">Generated on ${currentDate}</div>
-    </div>
-    
-    <div class="report-content">
-        ${formattedReport}
+    <div class="container">
+        <div class="header">
+            <div class="title">${topic}</div>
+            <div class="date">Research Report - ${currentDate}</div>
+        </div>
+        
+        <div class="content">
+            ${formattedReport}
+        </div>
+        
+        <div class="footer">
+            Generated by Research Hub
+        </div>
     </div>
 </body>
 </html>`;
 }
 
 function formatReportForPDF(report) {
-    // First, let's clean up the report text and ensure proper section separation
-    let cleanReport = report;
+    if (!report) return '';
     
-    // Remove any # symbols and clean up the text
-    cleanReport = cleanReport.replace(/#+/g, '');
+    // Clean up the report by removing markdown symbols
+    let cleanReport = report.replace(/#+/g, '');
     
     // Ensure main sections are on their own lines
     const mainSections = ['Executive Summary', 'Introduction', 'Key Findings', 'Conclusion', 'Thesis'];
@@ -669,146 +686,35 @@ function formatReportForPDF(report) {
     }).join('');
 }
 
-
-function showToast(message, type = 'success') {
+function showToast(message, type = 'info') {
     // Create toast element
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.textContent = message;
     
     // Style the toast
-    Object.assign(toast.style, {
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        padding: '12px 20px',
-        borderRadius: '8px',
-        color: 'white',
-        fontWeight: '500',
-        zIndex: '1000',
-        transform: 'translateX(100%)',
-        transition: 'transform 0.3s ease',
-        backgroundColor: type === 'error' ? '#ef4444' : '#10b981',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-    });
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4caf50' : type === 'warning' ? '#ff9800' : '#2196f3'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        z-index: 1000;
+        font-size: 14px;
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
     
+    // Add to page
     document.body.appendChild(toast);
     
-    // Animate in
+    // Remove after 3 seconds
     setTimeout(() => {
-        toast.style.transform = 'translateX(0)';
-    }, 100);
-    
-    // Remove after delay
-    setTimeout(() => {
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => {
-            document.body.removeChild(toast);
-        }, 300);
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
     }, 3000);
 }
-
-// Utility function to debounce input
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// Add some visual feedback for long operations
-function simulateProgress() {
-    const progressFill = document.querySelector('.progress-fill');
-    if (progressFill) {
-        progressFill.style.animation = 'none';
-        progressFill.offsetHeight; // Trigger reflow
-        progressFill.style.animation = 'progress 3s ease-in-out infinite';
-    }
-}
-
-// Initialize progress animation when status section is shown
-const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-            if (!statusSection.classList.contains('hidden')) {
-                simulateProgress();
-            }
-        }
-    });
-});
-
-observer.observe(statusSection, { attributes: true });
-
-// Add keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-    // Ctrl/Cmd + Enter to start research
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        startResearch();
-    }
-    
-    // Escape to clear input
-    if (e.key === 'Escape') {
-        researchTopicInput.value = '';
-        researchButton.disabled = true;
-    }
-});
-
-// Add focus management for accessibility
-researchTopicInput.addEventListener('focus', () => {
-    researchTopicInput.parentElement.classList.add('focused');
-});
-
-researchTopicInput.addEventListener('blur', () => {
-    researchTopicInput.parentElement.classList.remove('focused');
-});
-
-// Add loading state management
-function setLoadingState(loading) {
-    isResearching = loading;
-    researchButton.disabled = loading || !researchTopicInput.value.trim();
-    buttonText.textContent = loading ? 'Researching...' : 'Start Research';
-    spinner.classList.toggle('hidden', !loading);
-}
-
-// Error handling for network issues
-window.addEventListener('online', () => {
-    showToast('Connection restored', 'success');
-});
-
-window.addEventListener('offline', () => {
-    showToast('Connection lost', 'error');
-});
-
-// Force CSS reload for formatting changes
-function forceCSSReload() {
-    const links = document.querySelectorAll('link[rel="stylesheet"]');
-    links.forEach(link => {
-        const href = link.href;
-        link.href = href.split('?')[0] + '?v=' + Date.now();
-    });
-}
-
-// Add some helpful placeholder text rotation
-const placeholders = [
-    'Enter your research topic (e.g., "Artificial Intelligence in Healthcare")',
-    'What would you like to research? (e.g., "Climate Change Solutions")',
-    'Research topic (e.g., "Quantum Computing Applications")',
-    'Enter topic (e.g., "Sustainable Energy Technologies")'
-];
-
-let placeholderIndex = 0;
-setInterval(() => {
-    if (document.activeElement !== researchTopicInput) {
-        researchTopicInput.placeholder = placeholders[placeholderIndex];
-        placeholderIndex = (placeholderIndex + 1) % placeholders.length;
-    }
-}, 3000);
-
-// Debug: Log when CSS is loaded
-console.log('CSS loaded with academic formatting v11 - Numbered headings, no # symbols');
