@@ -1,13 +1,20 @@
 import os
+import io
+import re
 import asyncio
 import httpx
+import traceback
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import List, Dict, Any
-import traceback
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +51,11 @@ class ResearchResponse(BaseModel):
     status: str
     session_id: str = ""
     queue_position: int = 0
+
+
+class PDFRequest(BaseModel):
+    topic: str
+    report: str
 
 class OpenRouterClient:
     def __init__(self, api_key: str):
@@ -204,6 +216,134 @@ MAX_CONCURRENT_REQUESTS = 3
 research_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
 
+MAIN_SECTIONS = ["Executive Summary", "Introduction", "Key Findings", "Conclusion", "Thesis"]
+
+
+def parse_report_sections(report: str):
+    if not report:
+        return []
+
+    clean = report.replace('\r', '')
+    clean = clean.replace('#', '')
+
+    for section in MAIN_SECTIONS:
+        pattern = rf'(?<!\n){section}(?!\n)'
+        clean = re.sub(pattern, f"\n\n{section}\n\n", clean)
+
+    blocks = [block.strip() for block in re.split(r'\n\s*\n', clean) if block.strip()]
+
+    sections = []
+    current_heading = None
+    current_paragraphs: List[str] = []
+
+    for block in blocks:
+        normalized = re.sub(r'^\d+\.\s*', '', block).strip(' :.-')
+        if normalized in MAIN_SECTIONS:
+            if current_heading:
+                sections.append((current_heading, current_paragraphs))
+            current_heading = normalized
+            current_paragraphs = []
+            continue
+
+        matches = [sec for sec in MAIN_SECTIONS if normalized.startswith(sec)]
+        if matches:
+            if current_heading:
+                sections.append((current_heading, current_paragraphs))
+            current_heading = matches[0]
+            remainder = normalized[len(matches[0]):].strip(' :.-')
+            current_paragraphs = [remainder] if remainder else []
+            continue
+
+        current_paragraphs.append(block)
+
+    if current_heading:
+        sections.append((current_heading, current_paragraphs))
+
+    return sections
+
+
+def generate_pdf_bytes(topic: str, report: str) -> io.BytesIO:
+    cleaned_topic = (topic or "Research Report").strip()
+    if not report or not report.strip():
+        raise ValueError("Report content is empty.")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=0.75 * inch,
+        rightMargin=0.75 * inch,
+        topMargin=0.75 * inch,
+        bottomMargin=0.75 * inch,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "ReportTitle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        spaceAfter=18,
+    )
+    heading_style = ParagraphStyle(
+        "SectionHeading",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=13,
+        spaceAfter=12,
+    )
+    body_style = ParagraphStyle(
+        "BodyText",
+        parent=styles["BodyText"],
+        fontName="Times-Roman",
+        fontSize=11,
+        leading=14,
+        firstLineIndent=18,
+        alignment=TA_JUSTIFY,
+        spaceAfter=10,
+    )
+    bullet_style = ParagraphStyle(
+        "BulletText",
+        parent=body_style,
+        firstLineIndent=0,
+        leftIndent=28,
+        bulletIndent=12,
+        spaceAfter=6,
+        bulletFontName="Helvetica",
+        bulletFontSize=10,
+    )
+
+    story = []
+    story.append(Paragraph(cleaned_topic, title_style))
+    story.append(Spacer(1, 12))
+
+    sections = parse_report_sections(report)
+
+    if not sections:
+        story.append(Paragraph(report.replace('\n', '<br/>'), body_style))
+    else:
+        for index, (heading, paragraphs) in enumerate(sections, start=1):
+            story.append(Paragraph(f"{index}. {heading}", heading_style))
+            story.append(Spacer(1, 6))
+
+            if not paragraphs:
+                continue
+
+            for paragraph in paragraphs:
+                lines = [line.strip() for line in paragraph.splitlines() if line.strip()]
+                if lines and all(line.startswith('- ') for line in lines):
+                    for line in lines:
+                        story.append(Paragraph(line[2:], bullet_style, bulletText='•'))
+                else:
+                    story.append(Paragraph(paragraph.replace('\n', '<br/>'), body_style))
+
+            story.append(Spacer(1, 12))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
 def perform_research(topic: str) -> str:
     """Run the research pipeline synchronously away from the event loop."""
     cleaned_topic = (topic or "").strip()
@@ -270,6 +410,29 @@ async def conduct_research(request: ResearchRequest):
         print(f"Research error: {str(e)}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Research failed: {str(e)}")
+
+
+def build_pdf_filename(topic: str) -> str:
+    slug = re.sub(r'[^a-zA-Z0-9]+', '_', (topic or "Research Report")).strip('_').lower()
+    return slug or "research_report"
+
+
+@app.post("/api/download-pdf")
+async def download_pdf(request: PDFRequest):
+    """Generate a PDF version of the research report."""
+    try:
+        buffer = await asyncio.to_thread(generate_pdf_bytes, request.topic, request.report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        print(f"PDF generation error: {str(exc)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to generate PDF report")
+
+    filename = f"{build_pdf_filename(request.topic)}.pdf"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(buffer, media_type="application/pdf", headers=headers)
+
 
 if __name__ == "__main__":
     import uvicorn
