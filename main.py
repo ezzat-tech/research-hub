@@ -19,10 +19,10 @@ from reportlab.lib.units import inch
 # Load environment variables
 load_dotenv()
 
-# Get API keys from environment
+# Get API keys and settings from environment
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-OPENROUTER_MODEL = "deepseek/deepseek-chat-v3.1:free"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/hunter-alpha")
 
 # Initialize FastAPI app
 app = FastAPI(title="Research Hub", description="AI-powered research report generator")
